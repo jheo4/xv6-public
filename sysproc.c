@@ -116,3 +116,10 @@ sys_backtrace(void){
 
   return 0;
 }
+
+
+int
+sys_getprocs(void){
+  struct uproc *temp = 0;
+  return getprocs(64, temp);
+}

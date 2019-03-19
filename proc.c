@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "x86.h"
 #include "proc.h"
+#include "uproc.h"
 #include "spinlock.h"
 
 struct {
@@ -532,3 +533,74 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+
+int
+getprocs(uint num_procs, struct uproc *uproc_table){
+  struct proc *current_proc;
+  int effective_proc;
+
+  cprintf("UID    PID   PPID    PRI   SIZE    CMD\n");
+  acquire(&ptable.lock);
+  for(effective_proc = 0, current_proc = &ptable.proc[0];
+      current_proc < &ptable.proc[NPROC] && effective_proc < num_procs;
+      current_proc++){
+    if(current_proc->state != UNUSED){
+      uproc_table[effective_proc].pid = current_proc->pid;
+      uproc_table[effective_proc].uid = current_proc->uid;
+      uproc_table[effective_proc].gid = current_proc->gid;
+
+      if(!current_proc->parent)
+        uproc_table[effective_proc].ppid = current_proc->pid;
+      else
+        uproc_table[effective_proc].ppid = current_proc->parent->pid;
+
+      uproc_table[effective_proc].priority = current_proc->priority;
+
+      uproc_table[effective_proc].size
+        = current_proc->sz;
+
+      safestrcpy(uproc_table[effective_proc].pname, current_proc->name,
+          sizeof(current_proc->name));
+
+      switch(current_proc->state){
+      case UNUSED:
+        safestrcpy(uproc_table[effective_proc].state, "I",
+          sizeof(2));
+        break;
+      case EMBRYO:
+        // special case for xv6 compared to man ps
+        safestrcpy(uproc_table[effective_proc].state, "E",
+          sizeof(2));
+        break;
+      case SLEEPING:
+        safestrcpy(uproc_table[effective_proc].state, "S",
+          sizeof(2));
+        break;
+      case RUNNABLE:
+      case RUNNING:
+        safestrcpy(uproc_table[effective_proc].state, "R",
+          sizeof(2));
+        break;
+      case ZOMBIE:
+        safestrcpy(uproc_table[effective_proc].state, "Z",
+          sizeof(2));
+        break;
+      }
+
+      cprintf("%d      %d     %d       %d%s    %d   %s\n",
+        uproc_table[effective_proc].uid,
+        uproc_table[effective_proc].pid,
+        uproc_table[effective_proc].ppid,
+        uproc_table[effective_proc].priority,
+        &uproc_table[effective_proc].state,
+        uproc_table[effective_proc].size,
+        uproc_table[effective_proc].pname
+        );
+      effective_proc++;
+    }
+  }
+  release(&ptable.lock);
+  return effective_proc;
+}
+
