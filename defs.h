@@ -123,6 +123,15 @@ void            wakeup(void*);
 void            yield(void);
 int             getprocs(uint, struct uproc*);
 
+int             clone(void (*func) (void*), void *arg, void *stack);
+void            cleanThread(struct proc* p);
+int             join(int pid, void **stack, void **retVal);
+void            texit(void *retVal);
+void            mutex_lock(int mutex);
+void            mutex_unlock(int mutex);
+int             mutex_init(void);
+int             mutex_destroy(int mutex);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 

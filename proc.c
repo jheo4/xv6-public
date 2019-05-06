@@ -175,6 +175,176 @@ growproc(int n)
   return 0;
 }
 
+
+int
+clone(void (*func) (void*), void *arg, void *stack)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+  if((uint)stack + PGSIZE > (uint)curproc)
+    return -1;
+
+  np = allocproc();
+  if(np == 0)
+    return -1;
+
+  np->mtableShared = curproc->mtableShared;
+  np->mlockShared = curproc->mlockShared;
+
+  np->pgdir = curproc->pgdir;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  np->isThread = 1;
+  np->ustack = stack;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  np->tf->eax = 0;
+  np->tf->eip = (uint)func;
+
+  int top = (uint)stack+PGSIZE;
+  np->tf->esp = top;
+  np->tf->esp -= 4;
+  *(int*)np->tf->esp = (int)arg;
+  np->tf->esp -= 4;
+  *(int*)np->tf->esp = 0;
+
+  acquire(&ptable.lock);
+    np->state = RUNNABLE;
+  release(&ptable.lock);
+
+  pid = np->pid;
+  return pid;
+}
+
+void
+cleanThread(struct proc* p)
+{
+  kfree(p->kstack);
+  p->kstack = 0;
+  p->state = UNUSED;
+  p->pid = 0;
+  p->parent = 0;
+  p->name[0] = 0;
+  p->killed = 0;
+  p->joinedThread = 0;
+  p->ustack = 0;
+  p-> retVal = 0;
+  p->isThread = 0;
+}
+
+int
+join(int pid, void **stack, void **retVal)
+{
+  struct proc *thread;
+  struct proc *curproc = myproc();
+
+  for(thread = ptable.proc; thread < &ptable.proc[NPROC]; thread++){
+    if(thread->pid == pid)
+      break;
+  }
+  thread->joinedThread  = curproc;
+
+  acquire(&ptable.lock);
+
+    while(thread->state != ZOMBIE)
+      sleep(curproc, &ptable.lock);
+
+    if(stack != 0) *stack = thread->ustack;
+    if(retVal != 0) *retVal = thread->retVal;
+
+    cleanThread(thread);
+
+  release(&ptable.lock);
+
+  return 0;
+}
+
+
+void
+texit(void *retVal)
+{
+  myproc()->retVal = retVal;
+  exit();
+}
+
+
+void
+mutex_lock(int mutex)
+{
+  struct proc *curproc = myproc();
+  acquire(&curproc->mtableShared[mutex].lock);
+
+    // this is not a correct implementation of mutex; xchg
+    while(curproc->mtableShared[mutex].flag == 1){
+      sleep(curproc->mtableShared[mutex].cond,
+            &curproc->mtableShared[mutex].lock);
+    }
+    curproc->mtableShared[mutex].flag = 1;
+
+  release(&curproc->mtableShared[mutex].lock);
+}
+
+
+void
+mutex_unlock(int mutex)
+{
+  struct proc *curproc = myproc();
+
+  acquire(&curproc->mtableShared[mutex].lock);
+
+    curproc->mtableShared[mutex].flag = 0;
+    wakeup(curproc->mtableShared[mutex].cond);
+
+  release(&curproc->mtableShared[mutex].lock);
+}
+
+
+int
+mutex_init(void)
+{
+  int i;
+  struct proc *curproc = myproc();
+
+  acquire(curproc->mlockShared);
+    for(i = 0; i < 32; i++){
+      if(curproc->mtableShared[i].isFree){
+        curproc->mtableShared[i].isFree = 0;
+        curproc->mtableShared[i].flag = 0;
+        curproc->mtableShared[i].cond = curproc;
+
+        initlock(&curproc->mtableShared[i].lock, "mutex");
+        release(curproc->mlockShared);
+        return i;
+      }
+    }
+
+  release(curproc->mlockShared);
+  return -1;
+}
+
+
+int
+mutex_destroy(int mutex)
+{
+  struct proc *curproc = myproc();
+  if(curproc->mtableShared[mutex].isFree)
+    return -3;
+
+  acquire(curproc->mlockShared);
+    curproc->mtableShared[mutex].isFree = 1;
+  release(curproc->mlockShared);
+
+  return 0;
+}
+
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -213,10 +383,20 @@ fork(void)
 
   pid = np->pid;
 
+  np->joinedThread = 0;
+  np->retVal = 0;
+  np->ustack = 0;
+  np->isThread = 0;
+
+
+  for(i = 0; i < 32; i++)
+    np->mtable[i].isFree = 1;
+  np->mtableShared = np->mtable;
+  initlock(&np->mlock, "mtable");
+  np->mlockShared = &np->mlock;
+
   acquire(&ptable.lock);
-
-  np->state = RUNNABLE;
-
+    np->state = RUNNABLE;
   release(&ptable.lock);
 
   return pid;

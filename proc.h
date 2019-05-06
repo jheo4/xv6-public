@@ -1,3 +1,6 @@
+
+#include "spinlock.h"
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -34,6 +37,13 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+typedef struct {
+  int isFree;
+  struct spinlock lock;
+  int flag;
+  void *cond;
+} mutex_t;
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -54,6 +64,15 @@ struct proc {
   uint gid;
   struct proc* next;
   uint priority;
+
+  void *ustack;
+  void *retVal;
+  struct proc* joinedThread;
+  int isThread;
+  mutex_t mtable[32];
+  mutex_t *mtableShared;
+  struct spinlock mlock;
+  struct spinlock *mlockShared;
 };
 
 // Process memory is laid out contiguously, low addresses first:

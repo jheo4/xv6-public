@@ -106,6 +106,13 @@ extern int sys_uptime(void);
 extern int sys_backtrace(void);
 extern int sys_getprocs(void);
 
+extern int sys_clone(void);
+extern int sys_join(void);
+extern int sys_texit(void);
+extern int sys_mutex_init(void);
+extern int sys_mutex_destroy(void);
+extern int sys_mutex_lock(void);
+extern int sys_mutex_unlock(void);
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -130,6 +137,13 @@ static int (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_backtrace] sys_backtrace,
 [SYS_getprocs]      sys_getprocs,
+[SYS_clone]   sys_clone,
+[SYS_join]    sys_join,
+[SYS_texit]   sys_texit,
+[SYS_mutex_init] sys_mutex_init,
+[SYS_mutex_destroy] sys_mutex_destroy,
+[SYS_mutex_lock] sys_mutex_lock,
+[SYS_mutex_unlock] sys_mutex_unlock,
 };
 
 void

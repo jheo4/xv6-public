@@ -25,7 +25,18 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int backtrace(void);
+
+#include "uproc.h"
 int getprocs(uint, struct uproc*);
+
+int clone(void* (*func) (void *), void *arg, void *stack);
+int join(int pid, void **stack, void **retVal);
+void texit(void *retVal);
+void mutex_lock(int mutex);
+void mutex_unlock(int mutex);
+int mutex_init(void);
+int mutex_destroy(int mutex);
+
 
 // ulib.c
 int stat(const char*, struct stat*);
@@ -40,3 +51,4 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+

@@ -92,7 +92,8 @@ sys_uptime(void)
 
 
 int
-sys_backtrace(void){
+sys_backtrace(void)
+{
   // trap frame layout of xv6
   cprintf("trapframe registers============================================\n");
   cprintf("eax: 0x%x    ebx: 0x%x   ecx: 0x%x   edx: 0x%x\n",
@@ -119,7 +120,104 @@ sys_backtrace(void){
 
 
 int
-sys_getprocs(void){
+sys_getprocs(void)
+{
   struct uproc *temp = 0;
   return getprocs(64, temp);
+}
+
+
+int
+sys_clone(void)
+{
+  int func, arg, stack;
+
+  if(argint(0, &func) < 0)
+    return -1;
+  if(argint(1, &arg) < 0)
+    return -1;
+  if(argint(2, &stack) < 0)
+    return -1;
+
+  return clone((void *)func, (void *)arg, (void *)stack);
+}
+
+
+int
+sys_join(void)
+{
+  int pid, stack, retVal;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  if(argint(1, &stack) < 0)
+    return -1;
+  if(argint(2, &retVal) < 0)
+    return -1;
+
+  join(pid, (void **)stack, (void **)retVal);
+  return 0;
+}
+
+
+int
+sys_texit(void)
+{
+  int retVal;
+  if(argint(0, &retVal) < 0)
+    return -1;
+
+  texit((void *)retVal);
+  return 0;
+}
+
+
+int
+sys_mutex_init(void)
+{
+  return mutex_init();
+}
+
+
+int
+sys_mutex_destroy(void)
+{
+  int mutex;
+  if(argint(0, &mutex) < 0)
+    return -1;
+  if(mutex < 0 || mutex > 31)
+    return -2;
+  return mutex_destroy(mutex);
+}
+
+
+int
+sys_mutex_lock(void)
+{
+  int mutex_id;
+  if(argint(0, &mutex_id) < 0)
+    return -1;
+  if(mutex_id < 0 || mutex_id > 31)
+    return -2;
+  if(myproc()->mtableShared[mutex_id].isFree)
+    return -3;
+
+  mutex_lock(mutex_id);
+  return 0;
+}
+
+
+int
+sys_mutex_unlock(void)
+{
+  int mutex_id;
+  if(argint(0, &mutex_id) < 0)
+    return -1;
+  if(mutex_id < 0 || mutex_id > 31)
+    return -2;
+  if(myproc()->mtableShared[mutex_id].isFree)
+    return -3;
+
+  mutex_unlock(mutex_id);
+  return 0;
 }

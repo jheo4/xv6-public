@@ -2,7 +2,7 @@
 #include "user.h"
 #include "uproc.h"
 
-#define MAX_NUM_PROCS 72
+#define MAX_NUM_PROCS 64
 
 int getprocinfo(void) __attribute__((noinline));
 int
